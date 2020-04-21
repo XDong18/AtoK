@@ -61,7 +61,7 @@ ROOT_DIR= '/shared/xudongliu/data/argoverse-tracking/'
 
 # Setup directories
 data_dir = os.path.join(ROOT_DIR, args.data_split)
-goal_dir = os.path.join(ROOT_DIR, 'argo_track_all', args.data_split) # TODO the goal dir
+goal_dir = os.path.join(ROOT_DIR, 'argo_track_aggre5', args.data_split)
 oxts_dir = os.path.join(goal_dir, 'oxts')
 velo_dir = os.path.join(goal_dir, 'velodyne')
 img_dir = os.path.join(goal_dir, 'image_02')
@@ -101,37 +101,13 @@ CAMERA_KEY=['ring_front_center',
  'ring_side_left',
  'ring_side_right']
 
-OBJ_CLASS_MAPPING_DICT = {
-    "VEHICLE": 0,
-    "PEDESTRIAN": 1,
-    "ON_ROAD_OBSTACLE": 2,
-    "LARGE_VEHICLE": 3,
-    "BICYCLE": 4,
-    "BICYCLIST": 5,
-    "BUS": 6,
-    "OTHER_MOVER": 7,
-    "TRAILER": 8,
-    "MOTORCYCLIST": 9,
-    "MOPED": 10,
-    "MOTORCYCLE": 11,
-    "STROLLER": 12,
-    "EMERGENCY_VEHICLE": 13,
-    "ANIMAL": 14,
-    "WHEELCHAIR": 15,
-    "SCHOOL_BUS": 16,
-}
-
 CAMS = CAMERA_KEY[0:1]
 
 # Maximum thresholding distance for labelled objects
 # (Object beyond this distance will not be labelled)
 im_w=1920
 im_h=1200
-color_dir = {'vehicle':(0,0,255), 'large_vehicle':(255,0,0), 'bus':(0,255,0), 'trailer':(255,255,255), \
-            'pedestrian': (1,1,1), 'on_road_obstacle': (2,2,2), 'bicycle': (4,4,4), 'bicyclist': (5,5,5),\
-            'other_mover': (7,7,7), 'motorcyclist': (9,9,9), 'moped': (10,10,10), 'motorcycle': (11,11,11), \
-            'stroller': (12,12,12), 'emergency_vehicle': (13,13,13), 'animal': (14,14,14), 'wheelchair': (15,15,15), \
-            'school_bus': (16,16,16)}
+color_dir = {'vehicle':(0,0,255), 'large_vehicle':(255,0,0), 'bus':(0,255,0), 'trailer':(255,255,255)}
 ####################################################################
 """
 Your original file directory is:
@@ -361,11 +337,56 @@ def main():
 
                 # Loop through the each lidar frame (10Hz)
                 # to copy and reconfigure all images, lidars, 
-                # calibration files, and label files.  
+                # calibration files, and label files.
+                all_list_len = len(argoverse_data.lidar_timestamp_list)  
+                all_lidar_data_list = \
+                    [filter_ground_pts_polar_grid_mean_var(argoverse_data.get_lidar(index)) for index in range(all_list_len)]
+                
                 for indx, timestamp in enumerate(argoverse_data.lidar_timestamp_list):
 
                     # Save lidar file into .bin format under the new directory 
-                    lidar_data = argoverse_data.get_lidar(indx)
+                    # lidar_data = argoverse_data.get_lidar(indx)
+                    # lidar_data = filter_ground_pts_polar_grid_mean_var(lidar_data)
+                    '''
+                    the begin of aggredate data
+                    '''
+                    num_ag = 5
+                    if indx<int(num_ag/2) :
+                        lidar_data_list = [all_lidar_data_list[indx]]
+                        timestamp_list = [argoverse_data.lidar_timestamp_list[indx]]
+                        for fram_idx in range(num_ag):
+                            if fram_idx==indx:
+                                continue
+                            lidar_data_list.append(all_lidar_data_list[fram_idx])
+                            timestamp_list.append(argoverse_data.lidar_timestamp_list[fram_idx])
+                        # lidar_data_list = [argoverse_data.get_lidar(indx), argoverse_data.get_lidar(indx+1), argoverse_data.get_lidar(indx+2)]
+                        # timestamp_list = [argoverse_data.lidar_timestamp_list[indx], argoverse_data.lidar_timestamp_list[indx+1], argoverse_data.lidar_timestamp_list[indx+2]]
+                    elif indx>all_list_len-1-int(num_ag/2):
+                        lidar_data_list = [all_lidar_data_list[indx]]
+                        timestamp_list = [argoverse_data.lidar_timestamp_list[indx]]
+                        for fram_idx in range(all_list_len-1-num_ag, all_list_len):
+                            if fram_idx==indx:
+                                continue
+                            lidar_data_list.append(all_lidar_data_list[fram_idx])
+                            timestamp_list.append(argoverse_data.lidar_timestamp_list[fram_idx])
+                        # lidar_data_list = [argoverse_data.get_lidar(indx), argoverse_data.get_lidar(indx-1), argoverse_data.get_lidar(indx-2)]
+                        # timestamp_list = [argoverse_data.lidar_timestamp_list[indx], argoverse_data.lidar_timestamp_list[indx-1], argoverse_data.lidar_timestamp_list[indx-2]]
+                    else:
+                        lidar_data_list = [all_lidar_data_list[indx]]
+                        timestamp_list = [argoverse_data.lidar_timestamp_list[indx]]
+                        for fram_idx in range(indx-int(num_ag/2), indx+int(num_ag/2)+1):
+                            if fram_idx==indx:
+                                continue
+                            lidar_data_list.append(all_lidar_data_list[fram_idx])
+                            timestamp_list.append(argoverse_data.lidar_timestamp_list[fram_idx])
+                        # lidar_data_list = [argoverse_data.get_lidar(indx-1), argoverse_data.get_lidar(indx), argoverse_data.get_lidar(indx+1)]
+                        # timestamp_list = [argoverse_data.lidar_timestamp_list[indx], argoverse_data.lidar_timestamp_list[indx-1], argoverse_data.lidar_timestamp_list[indx+1]]
+                    
+                    aggregated_lidar_data = aggregate(lidar_data_list, timestamp_list, data_dir, log_key)
+                    '''
+                    the end of aggredate data
+                    '''
+                    lidar_data = aggregated_lidar_data # the change of lidar data
 
                     target_lidar_file_path = os.path.join(velo_dir, str(log_id).zfill(4), str(indx).zfill(6) + '.bin')
                     aug_lidar_file_path = os.path.join(velo_reduce_dir, str(log_id).zfill(4), str(indx).zfill(6) + '.ply')
@@ -425,8 +446,8 @@ def main():
     
                             # Filter target classes
                             classes= detected_object.label_class.lower()
-                            # if classes not in ['vehicle', 'large_vehicle', 'bus', 'trailer']:
-                            #     continue #TODO remove class constrain
+                            if classes not in ['vehicle', 'large_vehicle', 'bus', 'trailer']:
+                                continue
 
                             # Generate tracking id
                             if detected_object.track_id in trk_id_dict:
